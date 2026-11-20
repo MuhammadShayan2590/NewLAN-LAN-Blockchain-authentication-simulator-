@@ -1,0 +1,2 @@
+# NewLAN-LAN-Blockchain-authentication-simulator-
+A simulator with features showing a practical implementation of Local Area Network authentication through device MAC addresses, manual registration on blockchain with a Solidity contract, and using that to allow device to communicate over the network (To arbitrary end devices,can also increases to a server for simulating requests for these devices)
