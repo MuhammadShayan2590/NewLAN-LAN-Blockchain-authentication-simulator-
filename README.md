@@ -12,8 +12,9 @@ Everything is operated from one desktop app: **NewLAN**.
 | **Docker Desktop** | runs the FreeRADIUS server | docker.com/products/docker-desktop |
 | **Node.js (LTS)** | only to install Ganache from inside the app | nodejs.org. Not needed if you use the Ganache desktop app |
 | Internet | first run only: Python packages, Solidity compiler, Docker image | |
+| Ganache | Smart contract allow list (Blockchain)
 
-## How to run it
+##Instructions for Execution
 
 1. Keep every file from this folder together in one folder.
 2. Start **Docker Desktop** and wait until it says it is running.
@@ -28,7 +29,7 @@ Everything is operated from one desktop app: **NewLAN**.
 Next time you only need steps 2, 3 and **Start**. Ganache keeps its data in `ganache_data`, so the contract and
 the device list survive restarts.
 
-## Using the app
+##User manual
 
 Click the **☰** button (top left) to slide out the menu. Press **Esc** or click outside it to close it.
 
