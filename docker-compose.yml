@@ -1,0 +1,18 @@
+services:
+  freeradius:
+    build: .
+    container_name: freeradius_bridge
+    environment:
+      # Both values are passed in by control_panel.pyw; the defaults apply if you run compose by hand
+      GANACHE_URL: ${CONTAINER_GANACHE_URL:-http://host.docker.internal:8545}
+      RADIUS_SECRET: ${RADIUS_SECRET:-testing123}
+    volumes:
+      # Mounted (not baked in) so redeploying the contract needs no image rebuild
+      - ./auth_bridge.py:/etc/freeradius/mods-config/python3/auth_bridge.py:ro
+      - ./contract_info.json:/etc/freeradius/mods-config/python3/contract_info.json:ro
+    ports:
+      - "1812:1812/udp"
+      - "1813:1813/udp"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: freeradius -X

@@ -1,0 +1,22 @@
+{
+  "devices": {
+    "AABBCCDDEEFF": {
+      "name": "Device-EEFF",
+      "pos": [
+        78.7,
+        53.7,
+        8.8
+      ],
+      "ip": "10.20.0.11"
+    },
+    "AABBCCDDEEEE": {
+      "name": "Device-EEEE",
+      "pos": [
+        21.6,
+        18.7,
+        2.6
+      ],
+      "ip": "10.20.0.12"
+    }
+  }
+}
