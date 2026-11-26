@@ -1,11 +1,13 @@
 """NewLAN Packet store page: every packet sent across the eduroam network, live, searchable and exportable."""
+import time
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
-from newlan_widgets import (INK, LINE, MUTED, OFF, OK, PANEL, RED, RED_DARK, RED_SOFT, WHITE, FONT,
-                            Btn, make_entry)
+from newlan_widgets import (ACCENT, ACCENT_LO, BG, BORDER, CONSOLE, DIM, ERR, FONT, MONO, MUTED, OK, SURFACE, SURFACE2, TEXT,
+                            VIOLET, WARN, Btn, GradientBar, Sparkline, StatTile, chrome_bar, clock, make_entry)
 
 MAX_ROWS = 500          # rows drawn in the table (the store itself keeps up to 5000 and all of them in the file)
+BUCKETS, BUCKET_S = 24, 5
 
 
 class PacketsPage:
@@ -20,25 +22,42 @@ class PacketsPage:
         self.cb_status = None
         self._build(parent)
         self.store.on_add = lambda rec: self.app.ui(self.on_new_packet, rec)
+        clock.add("packets", lambda t: self._update_chart(), every=25)
 
     # ================================================================== layout
     def _build(self, parent):
-        head = tk.Frame(parent, bg=WHITE)
+        head = tk.Frame(parent, bg=BG)
         head.pack(fill="x", padx=36, pady=(22, 0))
-        tk.Label(head, text="Packet store", font=(FONT, 22, "bold"), fg=INK, bg=WHITE).pack(side="left")
-        self.count = tk.Label(head, text="", font=(FONT, 9), fg=MUTED, bg=WHITE)
+        tk.Label(head, text="Packet store", font=(FONT, 22, "bold"), fg=TEXT, bg=BG).pack(side="left")
+        self.count = tk.Label(head, text="", font=(FONT, 9), fg=MUTED, bg=BG)
         self.count.pack(side="left", padx=14, pady=(10, 0))
-        tk.Frame(parent, bg=RED, height=3, width=46).pack(anchor="w", padx=36, pady=(8, 0))
+        GradientBar(parent, ACCENT, VIOLET, height=3, width=56).pack(anchor="w", padx=36, pady=(8, 0))
         tk.Label(parent, text="Every packet sent over the eduroam network (messages, pings and replies, delivered or dropped), "
-                              "saved to eduroam_packets.jsonl.", font=(FONT, 9), fg=MUTED, bg=WHITE, anchor="w"
+                              "saved to eduroam_packets.jsonl.", font=(FONT, 9), fg=MUTED, bg=BG, anchor="w"
                  ).pack(fill="x", padx=36, pady=(6, 0))
 
-        bar = tk.Frame(parent, bg=WHITE)
+        stats = tk.Frame(parent, bg=BG)
+        stats.pack(fill="x", padx=36, pady=(10, 0))
+        for i in range(4):
+            stats.columnconfigure(i, weight=1, uniform="s")
+        stats.columnconfigure(4, weight=4)
+        self.t_total = StatTile(stats, "Packets stored", ACCENT)
+        self.t_ok = StatTile(stats, "Delivered", OK)
+        self.t_bad = StatTile(stats, "Dropped", ERR)
+        self.t_ms = StatTile(stats, "Avg latency", WARN, suffix=" ms")
+        for i, t in enumerate((self.t_total, self.t_ok, self.t_bad, self.t_ms)):
+            t.grid(row=0, column=i, sticky="nsew", padx=(0, 8))
+        chart = tk.Frame(stats, bg=SURFACE, highlightthickness=1, highlightbackground=BORDER)
+        chart.grid(row=0, column=4, sticky="nsew")
+        self.chart = Sparkline(chart, height=66)
+        self.chart.pack(fill="both", expand=True, padx=8, pady=6)
+
+        bar = tk.Frame(parent, bg=BG)
         bar.pack(fill="x", padx=36, pady=(10, 0))
         e = make_entry(bar, self.var_search, width=26)
         e.pack(side="left", ipady=5)
         e.bind("<KeyRelease>", lambda ev: self.reload())
-        tk.Label(bar, text="search device, IP, router or text", font=(FONT, 8), fg=OFF, bg=WHITE).pack(side="left", padx=(8, 14))
+        tk.Label(bar, text="search device, IP, router or text", font=(FONT, 8), fg=DIM, bg=BG).pack(side="left", padx=(8, 14))
         self.cb_kind = ttk.Combobox(bar, state="readonly", width=13, font=(FONT, 10), values=("All kinds", "message", "icmp-echo", "icmp-reply"))
         self.cb_kind.set("All kinds")
         self.cb_kind.pack(side="left", ipady=2)
@@ -47,10 +66,10 @@ class PacketsPage:
         self.cb_status.set("All status")
         self.cb_status.pack(side="left", padx=8, ipady=2)
         self.cb_status.bind("<<ComboboxSelected>>", lambda ev: self.reload())
-        Btn(bar, "Clear store", self.clear_store, "outline", "sm").pack(side="right")
+        Btn(bar, "Clear store", self.clear_store, "danger", "sm").pack(side="right")
         Btn(bar, "Export CSV", self.export_csv, "outline", "sm").pack(side="right", padx=6)
 
-        wrap = tk.Frame(parent, bg=WHITE, highlightthickness=1, highlightbackground=LINE)
+        wrap = tk.Frame(parent, bg=SURFACE, highlightthickness=1, highlightbackground=BORDER)
         wrap.pack(fill="both", expand=True, padx=36, pady=(10, 0))
         cols = (("id", "#", 52), ("time", "TIME", 92), ("kind", "KIND", 86), ("src", "FROM", 118), ("dst", "TO", 118),
                 ("path", "ROUTE", 150), ("size", "BYTES", 58), ("ms", "MS", 56), ("status", "STATUS", 84))
@@ -62,24 +81,24 @@ class PacketsPage:
         self.tree.configure(yscrollcommand=sb.set)
         self.tree.pack(side="left", fill="both", expand=True)
         sb.pack(side="right", fill="y")
-        self.tree.tag_configure("ok", foreground=INK)
-        self.tree.tag_configure("bad", foreground=RED)
-        self.tree.tag_configure("hover", background=RED_SOFT)
+        self.tree.tag_configure("ok", foreground=TEXT)
+        self.tree.tag_configure("bad", foreground=ERR)
+        self.tree.tag_configure("new", background=ACCENT_LO)
+        self.tree.tag_configure("hover", background=SURFACE2)
         self.tree.bind("<<TreeviewSelect>>", self._show_detail)
         self.tree.bind("<Motion>", self._hover)
         self.tree.bind("<Leave>", lambda e: self._hover(None))
 
-        box = tk.Frame(parent, bg=WHITE, highlightthickness=1, highlightbackground=LINE)
+        box = tk.Frame(parent, bg=CONSOLE, highlightthickness=1, highlightbackground=BORDER)
         box.pack(fill="x", padx=36, pady=(10, 16))
-        hdr = tk.Frame(box, bg=RED_SOFT)
-        hdr.pack(fill="x")
-        tk.Label(hdr, text="PACKET DETAILS", font=(FONT, 8, "bold"), fg=RED_DARK, bg=RED_SOFT, padx=12, pady=6).pack(side="left")
-        self.detail = tk.Text(box, bg=PANEL, fg=INK, font=("Consolas", 9), relief="flat", bd=0, wrap="word", padx=12, pady=8,
+        cbar, _ = chrome_bar(box, "packet-details")
+        cbar.pack(fill="x")
+        self.detail = tk.Text(box, bg=CONSOLE, fg=TEXT, font=(MONO, 9), relief="flat", bd=0, wrap="word", padx=12, pady=8,
                               height=6, state="disabled", cursor="arrow", highlightthickness=0)
         self.detail.pack(fill="x")
         self.detail.tag_configure("k", foreground=MUTED)
-        self.detail.tag_configure("bad", foreground=RED, font=("Consolas", 9, "bold"))
-        self.detail.tag_configure("ok", foreground=OK, font=("Consolas", 9, "bold"))
+        self.detail.tag_configure("bad", foreground=ERR, font=(MONO, 9, "bold"))
+        self.detail.tag_configure("ok", foreground=OK, font=(MONO, 9, "bold"))
         self._write_detail([("Select a packet above to see everything about it.", "k")])
 
     # ================================================================== data
@@ -118,15 +137,22 @@ class PacketsPage:
             self._insert(r, "end")
         self._update_count()
 
-    def _insert(self, r, where):
+    def _insert(self, r, where, fresh=False):
         iid = str(r["id"])
         self.records[iid] = r
-        self.tree.insert("", where, iid=iid, values=self._values(r), tags=("ok" if r["status"] == "delivered" else "bad",))
+        tags = ("ok" if r["status"] == "delivered" else "bad",) + (("new",) if fresh else ())
+        self.tree.insert("", where, iid=iid, values=self._values(r), tags=tags)
+        if fresh:                                                        # the new row glows, then settles
+            self.app.after(1400, self._settle, iid)
+
+    def _settle(self, iid):
+        if self.tree.exists(iid):
+            self.tree.item(iid, tags=tuple(t for t in self.tree.item(iid, "tags") if t != "new"))
 
     def on_new_packet(self, rec):
         """Called for every packet as it is stored (any page may be showing)."""
         if self.visible and self._matches(rec):
-            self._insert(rec, 0)
+            self._insert(rec, 0, fresh=True)
             kids = self.tree.get_children()
             if len(kids) > MAX_ROWS:
                 for old in kids[MAX_ROWS:]:
@@ -135,9 +161,26 @@ class PacketsPage:
         self._update_count()
 
     def _update_count(self):
-        total = len(self.store.snapshot())
+        rows = self.store.snapshot()
         shown = len(self.tree.get_children())
-        self.count.config(text=f"{total} stored  \u00b7  showing {shown}")
+        self.count.config(text=f"{len(rows)} stored  \u00b7  showing {shown}")
+        ok = sum(1 for r in rows if r["status"] == "delivered")
+        avg = (sum(r["latency_ms"] for r in rows) / len(rows)) if rows else 0
+        self.t_total.set(len(rows))
+        self.t_ok.set(ok)
+        self.t_bad.set(len(rows) - ok)
+        self.t_ms.set(avg, decimals=1)
+        self._update_chart(rows)
+
+    def _update_chart(self, rows=None):
+        rows = self.store.snapshot() if rows is None else rows
+        now = time.time()
+        counts = [0] * BUCKETS
+        for r in rows:
+            age = now - r.get("ts", 0)
+            if 0 <= age < BUCKETS * BUCKET_S:
+                counts[BUCKETS - 1 - int(age // BUCKET_S)] += 1
+        self.chart.set(counts, f"packets in the last {BUCKETS * BUCKET_S // 60} minutes, {BUCKET_S} s bars")
 
     def _hover(self, event):
         row = self.tree.identify_row(event.y) if event else ""
@@ -180,6 +223,7 @@ class PacketsPage:
         if path:
             self.store.export_csv(path)
             self.app.log(f"Packet store exported to {path}")
+            self.app.toasts.show("Packet store exported.", "ok")
 
     def clear_store(self):
         if messagebox.askyesno("Clear packet store?", "Delete every stored packet, including the saved file?"):

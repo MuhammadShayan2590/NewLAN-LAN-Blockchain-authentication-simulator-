@@ -13,8 +13,9 @@ from tkinter import ttk
 
 import newlan_core as core
 import newlan_eduroam as ed
-from newlan_widgets import (INK, LINE, MUTED, OFF, OK, PANEL, RED, RED_DARK, RED_MID, RED_SOFT, WHITE, FONT,
-                            Btn, SegTab, make_entry, round_rect)
+from newlan_widgets import (ACCENT, ACCENT_HI, ACCENT_LO, BG, BORDER, CONSOLE, DIM, ERR, FONT, MONO, MUTED, OFF, OK, ON_ACCENT,
+                            SURFACE, SURFACE2, TEXT, VIOLET, WARN, Btn, GradientBar, SegTab, chrome_bar, clock, ease, glow_rect,
+                            make_entry, mix, round_rect, wave)
 
 
 def other(side):
@@ -22,33 +23,33 @@ def other(side):
 
 
 class InterfaceBox(tk.Frame):
-    """One end device's screen: status header, scrolling output, and a message line."""
+    """One end device's screen, drawn like a terminal window: status header, scrolling output, message line."""
 
     def __init__(self, parent, on_send):
-        super().__init__(parent, bg=WHITE, highlightthickness=1, highlightbackground=LINE)
+        super().__init__(parent, bg=CONSOLE, highlightthickness=1, highlightbackground=BORDER)
         self.on_send = on_send
-        head = tk.Frame(self, bg=RED_SOFT)
-        head.pack(fill="x")
-        self.title = tk.Label(head, text="Interface", font=(FONT, 10, "bold"), fg=RED_DARK, bg=RED_SOFT, padx=12, pady=7)
-        self.title.pack(side="left")
-        self.chip = tk.Label(head, text="\u25cf  DOWN", font=(FONT, 8, "bold"), fg=OFF, bg=RED_SOFT, padx=12)
+        bar, self.title = chrome_bar(self, "Interface")
+        self.title.config(font=(FONT, 10, "bold"), fg=TEXT)
+        bar.pack(fill="x")
+        self.chip = tk.Label(bar, text="\u25cf  DOWN", font=(FONT, 8, "bold"), fg=OFF, bg=SURFACE2, padx=12)
         self.chip.pack(side="right")
-        self.meta = tk.Label(self, text="", font=("Consolas", 8), fg=MUTED, bg=WHITE, anchor="w", padx=12)
+        self.meta = tk.Label(self, text="", font=(MONO, 8), fg=MUTED, bg=CONSOLE, anchor="w", padx=12)
         self.meta.pack(fill="x", pady=(6, 0))
-        wrap = tk.Frame(self, bg=WHITE)
+        wrap = tk.Frame(self, bg=CONSOLE)
         wrap.pack(fill="both", expand=True, padx=1, pady=(4, 0))
-        self.text = tk.Text(wrap, bg=PANEL, fg=INK, font=("Consolas", 9), relief="flat", bd=0, wrap="word", padx=10,
+        self.text = tk.Text(wrap, bg=CONSOLE, fg=TEXT, font=(MONO, 9), relief="flat", bd=0, wrap="word", padx=10,
                             pady=8, height=7, width=30, state="disabled", cursor="arrow", highlightthickness=0)
         sb = ttk.Scrollbar(wrap, orient="vertical", command=self.text.yview)
         self.text.configure(yscrollcommand=sb.set)
         self.text.pack(side="left", fill="both", expand=True)
         sb.pack(side="right", fill="y")
-        self.text.tag_configure("time", foreground=OFF)
-        self.text.tag_configure("tx", foreground=RED, font=("Consolas", 9, "bold"))
-        self.text.tag_configure("rx", foreground=OK, font=("Consolas", 9, "bold"))
+        self.text.tag_configure("time", foreground=DIM)
+        self.text.tag_configure("tx", foreground=ACCENT, font=(MONO, 9, "bold"))
+        self.text.tag_configure("rx", foreground=OK, font=(MONO, 9, "bold"))
         self.text.tag_configure("sys", foreground=MUTED)
-        self.text.tag_configure("err", foreground=RED_DARK, font=("Consolas", 9, "bold"))
-        bottom = tk.Frame(self, bg=WHITE)
+        self.text.tag_configure("err", foreground=ERR, font=(MONO, 9, "bold"))
+        self.text.tag_configure("flash", background=ACCENT_LO)
+        bottom = tk.Frame(self, bg=CONSOLE)
         bottom.pack(fill="x", padx=8, pady=8)
         self.var = tk.StringVar()
         self.entry = make_entry(bottom, self.var)
@@ -70,10 +71,15 @@ class InterfaceBox(tk.Frame):
         self.send_btn.set_enabled(up)
         self.entry.config(state="normal" if up else "disabled")
 
-    def write(self, text, tag="", stamp=None):
+    def write(self, text, tag="", stamp=None, flash=True):
         self.text.config(state="normal")
+        start = self.text.index("end-1c")
         self.text.insert("end", (stamp or time.strftime("%H:%M:%S")) + "  ", "time")
         self.text.insert("end", text + "\n", tag)
+        if flash:                                                       # a new line glows briefly
+            end = self.text.index("end-1c")
+            self.text.tag_add("flash", start, end)
+            self.after(800, lambda: self.text.tag_remove("flash", start, end))
         self.text.see("end")
         self.text.config(state="disabled")
 
@@ -105,28 +111,30 @@ class RouterPage:
         self.periodic_token = 0
         self.hover_row = None
         self.combo_macs = []
+        self._tab = "network"
         self._build(parent)
+        clock.add("router", self._fx_tick)
 
     # ================================================================== layout
     def _build(self, parent):
-        head = tk.Frame(parent, bg=WHITE)
+        head = tk.Frame(parent, bg=BG)
         head.pack(fill="x", padx=36, pady=(22, 0))
-        tk.Label(head, text="Router", font=(FONT, 22, "bold"), fg=INK, bg=WHITE).pack(side="left")
+        tk.Label(head, text="Router", font=(FONT, 22, "bold"), fg=TEXT, bg=BG).pack(side="left")
         tk.Label(head, text=f"5 routers in a full mesh  \u00b7  network {ed.SUBNET}.0/24  \u00b7  one registration works at every router",
-                 font=(FONT, 9), fg=MUTED, bg=WHITE).pack(side="left", padx=14, pady=(10, 0))
-        tk.Frame(parent, bg=RED, height=3, width=46).pack(anchor="w", padx=36, pady=(8, 0))
+                 font=(FONT, 9), fg=MUTED, bg=BG).pack(side="left", padx=14, pady=(10, 0))
+        GradientBar(parent, ACCENT, VIOLET, height=3, width=56).pack(anchor="w", padx=36, pady=(8, 0))
 
-        tabs = tk.Frame(parent, bg=WHITE)
+        tabs = tk.Frame(parent, bg=BG)
         tabs.pack(fill="x", padx=36, pady=(12, 10))
         self.tab_net = SegTab(tabs, "Network", lambda: self.show_tab("network"))
         self.tab_con = SegTab(tabs, "Connections", lambda: self.show_tab("connections"))
         self.tab_net.pack(side="left")
         self.tab_con.pack(side="left", padx=8)
 
-        self.stage = tk.Frame(parent, bg=WHITE)
+        self.stage = tk.Frame(parent, bg=BG)
         self.stage.pack(fill="both", expand=True, padx=36, pady=(0, 14))
-        self.f_net = tk.Frame(self.stage, bg=WHITE)
-        self.f_con = tk.Frame(self.stage, bg=WHITE)
+        self.f_net = tk.Frame(self.stage, bg=BG)
+        self.f_con = tk.Frame(self.stage, bg=BG)
         for f in (self.f_net, self.f_con):
             f.place(x=0, y=0, relwidth=1, relheight=1)
         self._build_network(self.f_net)
@@ -134,18 +142,18 @@ class RouterPage:
         self.show_tab("network")
 
     def _build_network(self, f):
-        split = tk.Frame(f, bg=WHITE)
+        split = tk.Frame(f, bg=BG)
         split.pack(fill="both", expand=True)
         split.columnconfigure(0, weight=5, minsize=380)
         split.columnconfigure(1, weight=6)
         split.rowconfigure(0, weight=1)
-        left = tk.Frame(split, bg=WHITE, highlightthickness=1, highlightbackground=LINE)
+        left = tk.Frame(split, bg=BG, highlightthickness=1, highlightbackground=BORDER)
         left.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
-        self.topo = tk.Canvas(left, bg=WHITE, highlightthickness=0)
+        self.topo = tk.Canvas(left, bg=BG, highlightthickness=0)
         self.topo.pack(fill="both", expand=True)
         self.topo.bind("<Configure>", lambda e: self.draw_topology())
 
-        right = tk.Frame(split, bg=WHITE, highlightthickness=1, highlightbackground=LINE)
+        right = tk.Frame(split, bg=SURFACE, highlightthickness=1, highlightbackground=BORDER)
         right.grid(row=0, column=1, sticky="nsew")
         self.tree = ttk.Treeview(right, columns=("name", "mac", "router", "ip", "state"), show="headings",
                                  selectmode="browse")
@@ -158,63 +166,63 @@ class RouterPage:
         self.tree.pack(side="left", fill="both", expand=True)
         sb.pack(side="right", fill="y")
         self.tree.tag_configure("ok", foreground=OK)
-        self.tree.tag_configure("bad", foreground=RED)
-        self.tree.tag_configure("off", foreground=MUTED)
-        self.tree.tag_configure("hover", background=RED_SOFT)
+        self.tree.tag_configure("bad", foreground=ERR)
+        self.tree.tag_configure("off", foreground=DIM)
+        self.tree.tag_configure("hover", background=SURFACE2)
         self.tree.bind("<Motion>", self._tree_hover)
         self.tree.bind("<Leave>", lambda e: self._tree_hover(None))
         self.tree.bind("<<TreeviewSelect>>", self._pick_row)
 
-        bar = tk.Frame(f, bg=WHITE)
+        bar = tk.Frame(f, bg=BG)
         bar.pack(fill="x", pady=(10, 0))
-        tk.Label(bar, text="Name", font=(FONT, 10, "bold"), fg=INK, bg=WHITE).pack(side="left")
+        tk.Label(bar, text="Name", font=(FONT, 10, "bold"), fg=TEXT, bg=BG).pack(side="left")
         self.var_name = tk.StringVar()
         make_entry(bar, self.var_name, width=14).pack(side="left", padx=(8, 10), ipady=5)
         Btn(bar, "Connect (best router)", self.connect_selected, "primary").pack(side="left")
         Btn(bar, "Connect all", self.connect_all, "outline").pack(side="left", padx=6)
-        Btn(bar, "Disconnect", self.disconnect_selected, "outline").pack(side="left")
+        Btn(bar, "Disconnect", self.disconnect_selected, "danger").pack(side="left")
         Btn(bar, "Save name", self.save_name, "outline").pack(side="left", padx=6)
-        self.net_msg = tk.Label(f, text="", font=(FONT, 9), fg=MUTED, bg=WHITE, anchor="w")
+        self.net_msg = tk.Label(f, text="", font=(FONT, 9), fg=MUTED, bg=BG, anchor="w")
         self.net_msg.pack(fill="x", pady=(6, 0))
 
     def _build_connections(self, f):
-        form = tk.Frame(f, bg=WHITE, highlightthickness=1, highlightbackground=LINE, padx=14, pady=10)
+        form = tk.Frame(f, bg=SURFACE, highlightthickness=1, highlightbackground=BORDER, padx=14, pady=10)
         form.pack(fill="x")
-        tk.Label(form, text="Device A", font=(FONT, 10, "bold"), fg=INK, bg=WHITE).pack(side="left")
+        tk.Label(form, text="Device A", font=(FONT, 10, "bold"), fg=TEXT, bg=SURFACE).pack(side="left")
         self.cb_a = ttk.Combobox(form, state="readonly", width=26, font=(FONT, 10))
         self.cb_a.pack(side="left", padx=(8, 10), ipady=3)
-        tk.Label(form, text="\u21c4", font=(FONT, 16, "bold"), fg=RED, bg=WHITE).pack(side="left")
-        tk.Label(form, text="Device B", font=(FONT, 10, "bold"), fg=INK, bg=WHITE).pack(side="left", padx=(10, 0))
+        tk.Label(form, text="\u21c4", font=(FONT, 16, "bold"), fg=ACCENT, bg=SURFACE).pack(side="left")
+        tk.Label(form, text="Device B", font=(FONT, 10, "bold"), fg=TEXT, bg=SURFACE).pack(side="left", padx=(10, 0))
         self.cb_b = ttk.Combobox(form, state="readonly", width=26, font=(FONT, 10))
         self.cb_b.pack(side="left", padx=(8, 12), ipady=3)
         Btn(form, "Establish connection", self.establish, "primary").pack(side="left")
         self.con_msg = tk.Label(f, text="Pick any two connected devices, on the same router or different ones. "
                                         "Connect devices on the Network tab or the Eduroam testbed first.",
-                                font=(FONT, 9), fg=MUTED, bg=WHITE, anchor="w")
+                                font=(FONT, 9), fg=MUTED, bg=BG, anchor="w")
         self.con_msg.pack(fill="x", pady=(6, 0))
 
-        self.chip_row = tk.Frame(f, bg=WHITE)
+        self.chip_row = tk.Frame(f, bg=BG)
         self.chip_row.pack(fill="x", pady=(6, 0))
 
-        session = tk.Frame(f, bg=WHITE)
+        session = tk.Frame(f, bg=BG)
         session.pack(fill="both", expand=True, pady=(8, 0))
-        tool = tk.Frame(session, bg=WHITE)
+        tool = tk.Frame(session, bg=BG)
         tool.pack(fill="x")
-        self.session_title = tk.Label(tool, text="No connection selected", font=(FONT, 12, "bold"), fg=INK, bg=WHITE)
+        self.session_title = tk.Label(tool, text="No connection selected", font=(FONT, 12, "bold"), fg=TEXT, bg=BG)
         self.session_title.pack(side="left")
-        self.stats = tk.Label(tool, text="", font=(FONT, 9, "bold"), fg=MUTED, bg=WHITE)
+        self.stats = tk.Label(tool, text="", font=(FONT, 9, "bold"), fg=MUTED, bg=BG)
         self.stats.pack(side="left", padx=14)
-        Btn(tool, "Close connection", self.close_active, "outline", "sm").pack(side="right")
+        Btn(tool, "Close connection", self.close_active, "danger", "sm").pack(side="right")
         Btn(tool, "Clear screens", self.clear_screens, "outline", "sm").pack(side="right", padx=6)
         Btn(tool, "Run demo", self.run_demo, "primary", "sm").pack(side="right")
         Btn(tool, "Ping B \u2192 A", lambda: self.ping("b"), "outline", "sm").pack(side="right", padx=6)
         Btn(tool, "Ping A \u2192 B", lambda: self.ping("a"), "outline", "sm").pack(side="right")
 
-        self.link = tk.Canvas(session, bg=WHITE, height=108, highlightthickness=1, highlightbackground=LINE)
+        self.link = tk.Canvas(session, bg=BG, height=112, highlightthickness=1, highlightbackground=BORDER)
         self.link.pack(fill="x", pady=(8, 8))
         self.link.bind("<Configure>", lambda e: self.draw_link())
 
-        boxes = tk.Frame(session, bg=WHITE)
+        boxes = tk.Frame(session, bg=BG)
         boxes.pack(fill="both", expand=True)
         boxes.columnconfigure(0, weight=1, uniform="b")
         boxes.columnconfigure(1, weight=1, uniform="b")
@@ -227,10 +235,19 @@ class RouterPage:
         self.rebuild_chips()
 
     def show_tab(self, which):
+        self._tab = which
         self.tab_net.set_active(which == "network")
         self.tab_con.set_active(which == "connections")
         (self.f_net if which == "network" else self.f_con).tkraise()
         self.draw_topology() if which == "network" else self.draw_link()
+
+    def _fx_tick(self, t):
+        """Ambient motion while this page shows: flowing links and pulsing device lights."""
+        if self._tab == "network":
+            if self.net.attached:
+                self.draw_topology(t)
+        elif not self.pkts and self.active_cid is not None:
+            self.draw_link()
 
     # ================================================================== lifecycle
     def on_show(self):
@@ -250,7 +267,7 @@ class RouterPage:
     def on_kicked(self, kicked, closed):
         names = ", ".join(self.net.name(m) for m in kicked)
         self._notify_closed(closed, f"{names} was revoked on the blockchain and removed from the network.")
-        self._msg(f"{names} was revoked on the blockchain and removed from the network.", RED)
+        self._msg(f"{names} was revoked on the blockchain and removed from the network.", ERR)
         self.refresh_views()
 
     def refresh_views(self):
@@ -277,7 +294,7 @@ class RouterPage:
         self.hover_row = None
         self.tree.delete(*self.tree.get_children())
         if self.app.registry_problem:
-            self._msg(self.app.registry_problem, RED)
+            self._msg(self.app.registry_problem, ERR)
         for r in self.app.registry:
             mac = r["mac"]
             if not r["auth"]:
@@ -323,11 +340,11 @@ class RouterPage:
     def connect_selected(self):
         mac = self._selected_mac()
         if not mac:
-            self._msg("Select a device in the table first.", RED)
+            self._msg("Select a device in the table first.", ERR)
             return
         row = next((r for r in self.app.registry if r["mac"] == mac), None)
         if row and not row["auth"]:
-            self._msg("That device is revoked, so it cannot join the network.", RED)
+            self._msg("That device is revoked, so it cannot join the network.", ERR)
             return
         name = self.var_name.get().strip()
         if name:
@@ -338,7 +355,7 @@ class RouterPage:
             res = self.net.join(mac, self.be.router_authenticate)
             text = self._describe_join(mac, res)
             self.app.log("Eduroam: " + text)
-            self.app.ui(self._msg, text, OK if res["ok"] else RED)
+            self.app.ui(self._msg, text, OK if res["ok"] else ERR)
             self.app.ui(self.app.network_changed)
         self.app.bg(work)
 
@@ -355,14 +372,14 @@ class RouterPage:
                 res = self.net.join(mac, self.be.router_authenticate)
                 self.app.log("Eduroam: " + self._describe_join(mac, res))
                 ok += 1 if res["ok"] else 0
-            self.app.ui(self._msg, f"Connected {ok} of {len(macs)} device(s).", OK if ok == len(macs) else RED)
+            self.app.ui(self._msg, f"Connected {ok} of {len(macs)} device(s).", OK if ok == len(macs) else ERR)
             self.app.ui(self.app.network_changed)
         self.app.bg(work)
 
     def disconnect_selected(self):
         mac = self._selected_mac()
         if not mac or not self.net.is_connected(mac):
-            self._msg("Select a connected device first.", RED)
+            self._msg("Select a connected device first.", ERR)
             return
         label = self.net.name(mac)
         closed = self.net.leave(mac)
@@ -374,7 +391,7 @@ class RouterPage:
     def save_name(self):
         mac = self._selected_mac()
         if not mac:
-            self._msg("Select a device in the table first.", RED)
+            self._msg("Select a device in the table first.", ERR)
             return
         self.net.set_name(mac, self.var_name.get())
         self._msg(f"Saved name: {self.net.name(mac)}", OK)
@@ -386,7 +403,8 @@ class RouterPage:
             return self.net.path(conn["a"], conn["b"]), conn
         return [], None
 
-    def draw_topology(self):
+    def draw_topology(self, t=None):
+        t = time.time() if t is None else t
         c = self.topo
         c.delete("all")
         W, H = max(c.winfo_width(), 420), max(c.winfo_height(), 280)
@@ -402,17 +420,24 @@ class RouterPage:
         for i, a in enumerate(ids):                                # the full mesh: every router to every other
             for b in ids[i + 1:]:
                 on = frozenset((a, b)) in hot
-                c.create_line(pos[a][0], pos[a][1], pos[b][0], pos[b][1], fill=RED if on else RED_MID,
-                              width=3 if on else 1)
-        c.create_text(cx, cy, text="eduroam\nmesh", font=(FONT, 9, "bold"), fill=OFF, justify="center")
+                if on:
+                    c.create_line(pos[a][0], pos[a][1], pos[b][0], pos[b][1], fill=mix(BG, ACCENT, 0.3), width=9)
+                    c.create_line(pos[a][0], pos[a][1], pos[b][0], pos[b][1], fill=ACCENT_HI, width=2, dash=(6, 6),
+                                  dashoffset=int(t * 60) % 12)
+                else:
+                    c.create_line(pos[a][0], pos[a][1], pos[b][0], pos[b][1], fill=mix(BG, VIOLET, 0.45), width=1)
+        c.create_text(cx, cy, text="eduroam\nmesh", font=(FONT, 9, "bold"), fill=DIM, justify="center")
         selected = self._selected_mac()
         for r in ed.ROUTERS:
             x, y, ux, uy = pos[r["id"]]
             load = self.net.load(r["id"])
-            round_rect(c, x - 52, y - 20, x + 52, y + 20, 10, fill=RED if load else WHITE,
-                       outline=RED_DARK if r["id"] in path else RED, width=3 if r["id"] in path else 2)
-            c.create_text(x, y - 6, text=f"{r['id']}  {r['name']}", font=(FONT, 9, "bold"), fill=WHITE if load else RED_DARK)
-            c.create_text(x, y + 8, text=f"{load}/{r['capacity']} devices", font=(FONT, 8), fill=WHITE if load else MUTED)
+            on_path = r["id"] in path
+            if load or on_path:
+                glow_rect(c, x - 52, y - 20, x + 52, y + 20, 10, ACCENT_HI if on_path else ACCENT, layers=3)
+            round_rect(c, x - 52, y - 20, x + 52, y + 20, 10, fill=ACCENT_LO if load else SURFACE,
+                       outline=ACCENT_HI if on_path else (ACCENT if load else BORDER), width=3 if on_path else 2)
+            c.create_text(x, y - 6, text=f"{r['id']}  {r['name']}", font=(FONT, 9, "bold"), fill=TEXT)
+            c.create_text(x, y + 8, text=f"{load}/{r['capacity']} devices", font=(FONT, 8), fill=ACCENT_HI if load else MUTED)
             macs = sorted((m for m, rid in self.net.attached.items() if rid == r["id"]), key=self.net.name)
             bx, by = x + ux * 38, y + uy * 34
             vx, vy = -uy, ux
@@ -422,15 +447,18 @@ class RouterPage:
                 n_in = min(5, len(shown) - row * 5)
                 off = (col - (n_in - 1) / 2) * 15
                 dx, dy = bx + ux * row * 15 + vx * off, by + uy * row * 15 + vy * off
-                c.create_line(x + ux * 20, y + uy * 14, dx, dy, fill=RED_MID)
+                c.create_line(x + ux * 20, y + uy * 14, dx, dy, fill=mix(BG, ACCENT, 0.35))
                 is_end = conn and m in (conn["a"], conn["b"])
-                c.create_oval(dx - 5, dy - 5, dx + 5, dy + 5, fill=RED if is_end else OK, outline=WHITE, width=1)
+                col_dot = ACCENT_HI if is_end else OK
+                ring = 6 + 3 * wave(t + k * 0.23, 1.8)
+                c.create_oval(dx - ring, dy - ring, dx + ring, dy + ring, outline=mix(BG, col_dot, 0.45 * (1 - (ring - 6) / 3 * 0.6)))
+                c.create_oval(dx - 4.5, dy - 4.5, dx + 4.5, dy + 4.5, fill=col_dot, outline=BG, width=1)
                 if m == selected:
-                    c.create_oval(dx - 9, dy - 9, dx + 9, dy + 9, outline=RED_DARK, width=2)
+                    c.create_oval(dx - 10, dy - 10, dx + 10, dy + 10, outline=ACCENT_HI, width=2)
             if len(macs) > 10:
                 c.create_text(bx + ux * 40, by + uy * 40, text=f"+{len(macs) - 10}", font=(FONT, 8), fill=MUTED)
         c.create_text(12, H - 14, anchor="w", font=(FONT, 8), fill=MUTED,
-                      text="\u25cf device     \u2500 mesh link     red = path of the selected connection")
+                      text="\u25cf device     \u2500 mesh link     glowing path = the selected connection")
 
     # ================================================================== connections tab
     def _cmsg(self, text, color=MUTED):
@@ -455,13 +483,13 @@ class RouterPage:
     def establish(self):
         ia, ib = self.cb_a.current(), self.cb_b.current()
         if ia < 0 or ib < 0:
-            self._cmsg("Choose Device A and Device B first (only connected devices are listed).", RED)
+            self._cmsg("Choose Device A and Device B first (only connected devices are listed).", ERR)
             return
         a, b = self.combo_macs[ia], self.combo_macs[ib]
         try:
             conn = self.net.open_connection(a, b)
         except ValueError as e:
-            self._cmsg(str(e), RED)
+            self._cmsg(str(e), ERR)
             return
         self._opened(conn)
 
@@ -481,10 +509,10 @@ class RouterPage:
     def rebuild_chips(self):
         for w in self.chip_row.winfo_children():
             w.destroy()
-        tk.Label(self.chip_row, text="Active connections", font=(FONT, 9, "bold"), fg=MUTED, bg=WHITE).pack(side="left", padx=(0, 10))
+        tk.Label(self.chip_row, text="Active connections", font=(FONT, 9, "bold"), fg=MUTED, bg=BG).pack(side="left", padx=(0, 10))
         conns = self.net.open_connections()
         if not conns:
-            tk.Label(self.chip_row, text="none yet", font=(FONT, 9), fg=OFF, bg=WHITE).pack(side="left")
+            tk.Label(self.chip_row, text="none yet", font=(FONT, 9), fg=DIM, bg=BG).pack(side="left")
         for c in conns:
             cid = c["id"]
             Btn(self.chip_row, f"{self.net.name(c['a'])}  \u21c4  {self.net.name(c['b'])}",
@@ -497,7 +525,7 @@ class RouterPage:
         for side in ("a", "b"):
             self.boxes[side].clear()
             for stamp, text, tag in data[side]:
-                self.boxes[side].write(text, tag, stamp)
+                self.boxes[side].write(text, tag, stamp, flash=False)
         self.rebuild_chips()
         self.refresh_session()
         self.draw_topology()
@@ -513,7 +541,7 @@ class RouterPage:
             a, b, up = conn["a"], conn["b"], conn["state"] == "open"
             self.session_title.config(text=f"{self.net.name(a)}  \u21c4  {self.net.name(b)}")
             self.stats.config(text=f"{'OPEN' if up else 'CLOSED'}   sent {conn['sent']}  \u00b7  delivered "
-                                   f"{conn['delivered']}  \u00b7  dropped {conn['dropped']}", fg=OK if up else RED)
+                                   f"{conn['delivered']}  \u00b7  dropped {conn['dropped']}", fg=OK if up else ERR)
             for side, mac in (("a", a), ("b", b)):
                 self.boxes[side].set_device(f"{self.net.name(mac)}   ({side.upper()})", self.net.ip(mac), core.pretty_mac(mac),
                                             router_label(self.net.router_of(mac)) if self.net.is_connected(mac) else "",
@@ -537,7 +565,7 @@ class RouterPage:
     def close_active(self):
         conn = self.net.connections.get(self.active_cid) if self.active_cid else None
         if not conn or conn["state"] != "open":
-            self._cmsg("There is no open connection selected.", RED)
+            self._cmsg("There is no open connection selected.", ERR)
             return
         self.demo_token += 1
         self.net.close_connection(conn["id"])
@@ -558,7 +586,7 @@ class RouterPage:
     def _open_conn(self):
         conn = self.net.connections.get(self.active_cid) if self.active_cid else None
         if not conn or conn["state"] != "open":
-            self._cmsg("Establish or select an open connection first.", RED)
+            self._cmsg("Establish or select an open connection first.", ERR)
             return None
         return conn
 
@@ -727,6 +755,7 @@ class RouterPage:
             c.create_text(W / 2, H / 2, text="Establish or select a connection to watch live traffic here.",
                           font=(FONT, 10), fill=MUTED)
             return
+        now = time.time()
         up = conn["state"] == "open"
         path = self.net.path(conn["a"], conn["b"]) if up else []
         nodes = [("dev", conn["a"])] + [("rt", r) for r in path] + [("dev", conn["b"])]
@@ -737,29 +766,41 @@ class RouterPage:
         xs = [margin + (W - 2 * margin) * i / (n - 1) for i in range(n)]
         for i in range(n - 1):
             x1, x2 = xs[i] + half[nodes[i][0]], xs[i + 1] - half[nodes[i + 1][0]]
-            c.create_line(x1, cy, x2, cy, fill=RED if up else LINE, width=2, dash=() if up else (5, 4))
+            if up:
+                c.create_line(x1, cy, x2, cy, fill=mix(BG, ACCENT, 0.28), width=6)
+                c.create_line(x1, cy, x2, cy, fill=ACCENT, width=2, dash=(5, 7), dashoffset=int(now * 40) % 12)
+            else:
+                c.create_line(x1, cy, x2, cy, fill=BORDER, width=2, dash=(5, 4))
             if nodes[i][0] == "rt" and nodes[i + 1][0] == "rt":
-                c.create_text((x1 + x2) / 2, cy + 12, text="mesh", font=(FONT, 8), fill=MUTED)
+                c.create_text((x1 + x2) / 2, cy + 14, text="mesh", font=(FONT, 8), fill=MUTED)
         checking = any(p["cid"] == conn["id"] and p["phase"] == "inspect" for p in self.pkts)
         for i, (kind, ident) in enumerate(nodes):
             x, w = xs[i], half[kind]
             if kind == "dev":
                 live = up and self.net.is_connected(ident)
-                outline, fill, tc, sc = (OK if live else RED), WHITE, INK, MUTED
+                outline, fill, tc, sc = (OK if live else ERR), SURFACE2, TEXT, MUTED
                 title, sub = self.net.name(ident)[:16], self.net.ip(ident)
             else:
                 r = ed.ROUTER_BY_ID[ident]
-                outline, fill, tc, sc = RED_DARK, RED, WHITE, WHITE
+                outline, fill, tc, sc = ACCENT, ACCENT_LO, TEXT, ACCENT_HI
                 title = f"{ident} {r['name']}"
                 sub = "checking ledger..." if (checking and i == 1) else f"{self.net.load(ident)}/{r['capacity']} devices"
+                if checking and i == 1:                                        # spinner while the ledger is consulted
+                    glow_rect(c, x - w, cy - nh / 2, x + w, cy + nh / 2, 10, ACCENT_HI, layers=3)
+                    c.create_arc(x - 11, cy - nh / 2 - 22, x + 11, cy - nh / 2 - 2, start=-(now * 360) % 360, extent=100,
+                                 style="arc", outline=ACCENT_HI, width=3)
             round_rect(c, x - w, cy - nh / 2, x + w, cy + nh / 2, 10, fill=fill, outline=outline, width=2)
             c.create_text(x, cy - 8, text=title, font=(FONT, 9, "bold"), fill=tc)
-            c.create_text(x, cy + 11, text=sub, font=("Consolas", 8), fill=sc)
+            c.create_text(x, cy + 11, text=sub, font=(MONO, 8), fill=sc)
 
-        def bubble(x, y, label, fill):
+        def bubble(x, y, label, fill, trail_dir):
+            for k in range(1, 5):                                              # comet tail
+                tx = x + trail_dir * k * 9
+                c.create_oval(tx - 4 + k * 0.6, y - 4 + k * 0.6, tx + 4 - k * 0.6, y + 4 - k * 0.6,
+                              fill=mix(BG, fill, 0.5 - k * 0.1), outline="")
             bw = 7 * len(label) + 20
-            round_rect(c, x - bw / 2, y - 12, x + bw / 2, y + 12, 9, fill=fill, outline="")
-            c.create_text(x, y, text=label, font=(FONT, 8, "bold"), fill=WHITE)
+            round_rect(c, x - bw / 2, y - 12, x + bw / 2, y + 12, 9, fill=fill, outline=mix(fill, BG, 0.4))
+            c.create_text(x, y, text=label, font=(FONT, 8, "bold"), fill=ON_ACCENT)
         for p in self.pkts:
             if p["cid"] != conn["id"]:
                 continue
@@ -770,18 +811,22 @@ class RouterPage:
             i, j = order[leg], order[leg + 1]
             start = xs[i] + (half[nodes[i][0]] if right else -half[nodes[i][0]])
             end = xs[j] - (half[nodes[j][0]] if right else -half[nodes[j][0]])
-            col = {"msg": RED, "icmp": RED_DARK, "reply": OK}[p["kind"]]
+            col = {"msg": ACCENT, "icmp": VIOLET, "reply": OK}[p["kind"]]
             if p["inspected"] and p["kind"] != "reply":
                 col = OK
+            trail = -1 if right else 1
             if ph == "leg":
                 e = self._ease((time.time() - p["t0"]) / self.DUR_LEG)
-                bubble(start + (end - start) * e, cy - 34, p["label"], col)
+                bubble(start + (end - start) * e, cy - 34, p["label"], col, trail)
             elif ph == "inspect":
-                bubble(end, cy - 34, p["label"], col)
+                bubble(end, cy - 34, p["label"], col, trail)
             elif ph == "drop":
                 bx = xs[order[1]]
-                c.create_oval(bx - 15, cy - 54, bx + 15, cy - 24, fill=RED, outline=WHITE, width=2)
-                c.create_text(bx, cy - 40, text="\u2717", font=(FONT, 13, "bold"), fill=WHITE)
+                age = (time.time() - p["t0"]) / self.DUR_DROP
+                c.create_oval(bx - 15, cy - 54, bx + 15, cy - 24, fill=ERR, outline=SURFACE, width=2)
+                c.create_text(bx, cy - 40, text="\u2717", font=(FONT, 13, "bold"), fill=ON_ACCENT)
+                rad = 18 + age * 34
+                c.create_oval(bx - rad, cy - 39 - rad, bx + rad, cy - 39 + rad, outline=mix(ERR, BG, min(1.0, age)), width=2)
 
     @staticmethod
     def _ease(p):
